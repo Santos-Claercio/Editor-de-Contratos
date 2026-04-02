@@ -1,0 +1,65 @@
+@import './fonts.css';
+@import './tailwind.css';
+@import './theme.css';
+
+/* Estilos do React Quill */
+.ql-container {
+  font-family: Arial, sans-serif;
+  font-size: 14px;
+}
+
+.ql-editor {
+  min-height: 500px;
+  padding: 40px;
+  background: white;
+}
+
+.ql-toolbar {
+  background: #f8f9fa;
+  border: 1px solid #e5e7eb !important;
+  border-radius: 8px 8px 0 0;
+  padding: 12px;
+}
+
+.ql-container {
+  border: 1px solid #e5e7eb !important;
+  border-radius: 0 0 8px 8px;
+  background: white;
+}
+
+.ql-editor strong {
+  font-weight: bold;
+}
+
+.ql-editor h1 {
+  font-size: 2em;
+  font-weight: bold;
+  margin: 0.67em 0;
+}
+
+.ql-editor h2 {
+  font-size: 1.5em;
+  font-weight: bold;
+  margin: 0.75em 0;
+}
+
+.ql-editor h3 {
+  font-size: 1.17em;
+  font-weight: bold;
+  margin: 0.83em 0;
+}
+
+/* Ocultar editor na impressão */
+@media print {
+  .ql-toolbar {
+    display: none !important;
+  }
+  
+  .ql-container {
+    border: none !important;
+  }
+  
+  .ql-editor {
+    padding: 0;
+  }
+}
