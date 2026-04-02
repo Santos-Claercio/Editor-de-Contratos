@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from './ui/dialog';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, Upload } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 
 export function AddContractDialog({ isOpen, onClose, onAdd }) {
@@ -16,6 +16,7 @@ export function AddContractDialog({ isOpen, onClose, onAdd }) {
     template: '',
   });
 
+  const fileInputRef = useRef(null);
   const [newFieldName, setNewFieldName] = useState('');
   const [newFieldLabel, setNewFieldLabel] = useState('');
   const [newFieldType, setNewFieldType] = useState('text');
@@ -70,6 +71,34 @@ export function AddContractDialog({ isOpen, onClose, onAdd }) {
         template: '',
       });
       onClose();
+    }
+  };
+
+  const handleFileUpload = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    if (file.type !== 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+      alert('Por favor, selecione um arquivo Word (.docx)');
+      return;
+    }
+
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      
+      // Usando a biblioteca mammoth para extrair texto do DOCX
+      const mammoth = await import('mammoth');
+      const result = await mammoth.convertToHtml({ arrayBuffer });
+      
+      setContractData(prev => ({ ...prev, template: result.value }));
+    } catch (error) {
+      console.error('Erro ao processar arquivo:', error);
+      alert('Erro ao processar o arquivo. Tente novamente.');
+    }
+
+    // Limpar o input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
   };
 
@@ -232,12 +261,25 @@ export function AddContractDialog({ isOpen, onClose, onAdd }) {
 
           {/* Template */}
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
               <h4 className="font-semibold text-sm">Template do Contrato *</h4>
-              <Button type="button" variant="outline" size="sm" onClick={generateTemplateHelper}>
-                Gerar Template Base
-              </Button>
+              <div className="flex gap-2">
+                <Button type="button" variant="outline" size="sm" onClick={generateTemplateHelper}>
+                  Gerar Template Base
+                </Button>
+                <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
+                  <Upload className="w-4 h-4 mr-1" />
+                  Importar Word
+                </Button>
+              </div>
             </div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".docx"
+              onChange={handleFileUpload}
+              className="hidden"
+            />
             <p className="text-xs text-gray-600">
               Use HTML para formatar. Variáveis: {`\${data.nomeCompleto}, \${data.cpf}, \${data.identidade}, \${data.dataContrato}`}, etc.
               Para campos personalizados use: {`\${data.nomeDoCampo}`}
