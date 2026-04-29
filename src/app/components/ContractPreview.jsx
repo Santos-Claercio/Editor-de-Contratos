@@ -255,150 +255,236 @@ export function ContractPreview({ contractType, contractData, onEdit, onBack }) 
   };
 
   const generateWordDocument = async () => {
-    // Converter HTML para texto plano e processar
-    const tempDiv = document.createElement('div');
-    tempDiv.innerHTML = editorContent;
-    
-    const paragraphs = [];
-    
-    // Processar cada elemento
-    const processNode = (node) => {
-      if (node.nodeType === Node.TEXT_NODE) {
-        const text = node.textContent.trim();
-        if (text) {
-          return new TextRun({ text });
-        }
-        return null;
-      }
+    try {
+      // Obter o conteúdo atualizado do editor
+      const currentContent = editorContent;
       
-      if (node.nodeType === Node.ELEMENT_NODE) {
-        const tagName = node.tagName.toLowerCase();
-        const text = node.textContent.trim();
+      // Criar um elemento temporário para processar o HTML
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = currentContent;
+      
+      const paragraphs = [];
+      
+      // Função para processar nós de texto e elementos
+      const processTextRuns = (element, baseSize = 22) => {
+        const runs = [];
         
-        if (!text) return null;
-        
-        // Configurações de estilo baseadas na tag
-        const runConfig = { text };
-        
-        if (tagName === 'strong' || tagName === 'b' || node.style.fontWeight === 'bold') {
-          runConfig.bold = true;
-        }
-        if (tagName === 'em' || tagName === 'i') {
-          runConfig.italics = true;
-        }
-        if (tagName === 'u') {
-          runConfig.underline = {};
-        }
-        
-        // Títulos
-        if (tagName === 'h1') {
-          runConfig.bold = true;
-          runConfig.size = 28;
-        } else if (tagName === 'h2') {
-          runConfig.bold = true;
-          runConfig.size = 24;
-        } else if (tagName === 'h3') {
-          runConfig.bold = true;
-          runConfig.size = 22;
-        } else {
-          runConfig.size = 22;
-        }
-        
-        return new TextRun(runConfig);
-      }
-      
-      return null;
-    };
-    
-    // Processar todos os parágrafos
-    const elements = tempDiv.querySelectorAll('p, h1, h2, h3, h4, h5, h6');
-    elements.forEach((element) => {
-      const text = element.textContent.trim();
-      
-      if (!text || text === '') {
-        paragraphs.push(new Paragraph({ text: '' }));
-        return;
-      }
-      
-      const tagName = element.tagName.toLowerCase();
-      const alignment = element.style.textAlign === 'center' ? AlignmentType.CENTER : 
-                       element.style.textAlign === 'right' ? AlignmentType.RIGHT :
-                       element.style.textAlign === 'justify' ? AlignmentType.JUSTIFIED :
-                       AlignmentType.LEFT;
-      
-      const children = [];
-      
-      // Processar elementos filhos
-      const processChildren = (node) => {
-        node.childNodes.forEach(child => {
-          if (child.nodeType === Node.TEXT_NODE) {
-            const text = child.textContent;
-            if (text) {
-              children.push(new TextRun({ 
-                text,
-                size: tagName === 'h1' ? 28 : tagName === 'h2' ? 24 : 22
-              }));
-            }
-          } else if (child.nodeType === Node.ELEMENT_NODE) {
-            const childTag = child.tagName.toLowerCase();
-            const childText = child.textContent;
-            
-            if (childText) {
-              const config = { 
-                text: childText,
-                size: tagName === 'h1' ? 28 : tagName === 'h2' ? 24 : 22
-              };
-              
-              if (childTag === 'strong' || childTag === 'b') config.bold = true;
-              if (childTag === 'em' || childTag === 'i') config.italics = true;
-              if (childTag === 'u') config.underline = {};
-              
-              children.push(new TextRun(config));
+        if (element.nodeType === Node.TEXT_NODE) {
+          const text = element.textContent.trim();
+          if (text) {
+            runs.push(new TextRun({ 
+              text,
+              size: baseSize
+            }));
+          }
+        } else if (element.nodeType === Node.ELEMENT_NODE) {
+          const tagName = element.tagName.toLowerCase();
+          const text = element.textContent;
+          
+          if (!text) return runs;
+          
+          let config = { 
+            text,
+            size: baseSize
+          };
+          
+          // Aplicar estilos baseados na tag e atributos
+          if (tagName === 'strong' || tagName === 'b' || element.style.fontWeight === 'bold') {
+            config.bold = true;
+          }
+          if (tagName === 'em' || tagName === 'i' || element.style.fontStyle === 'italic') {
+            config.italics = true;
+          }
+          if (tagName === 'u' || element.style.textDecoration === 'underline') {
+            config.underline = {};
+          }
+          
+          // Verificar estilos inline
+          if (element.style.color) {
+            config.color = element.style.color;
+          }
+          if (element.style.fontSize) {
+            const size = parseInt(element.style.fontSize);
+            if (!isNaN(size)) {
+              config.size = size * 0.75; // Converter px para points (aproximado)
             }
           }
-        });
+          
+          runs.push(new TextRun(config));
+        }
+        
+        return runs;
       };
       
-      processChildren(element);
+      // Processar todos os elementos de bloco
+      const blockElements = tempDiv.querySelectorAll('p, h1, h2, h3, h4, h5, h6, div, br');
       
-      if (children.length === 0) {
-        children.push(new TextRun({ 
-          text,
-          bold: tagName.startsWith('h') || element.querySelector('strong, b') !== null,
-          size: tagName === 'h1' ? 28 : tagName === 'h2' ? 24 : 22
-        }));
+      blockElements.forEach((element) => {
+        const tagName = element.tagName.toLowerCase();
+        
+        // Função melhorada para detectar alinhamento
+        const getAlignment = (element) => {
+          // 1. Verificar estilo inline primeiro (mais prioritário)
+          const textAlign = element.style.textAlign;
+          if (textAlign === 'center') return AlignmentType.CENTER;
+          if (textAlign === 'right') return AlignmentType.RIGHT;
+          if (textAlign === 'justify') return AlignmentType.JUSTIFIED;
+          
+          // 2. Verificar classes do Quill
+          if (element.classList.contains('ql-align-center')) return AlignmentType.CENTER;
+          if (element.classList.contains('ql-align-right')) return AlignmentType.RIGHT;
+          if (element.classList.contains('ql-align-justify')) return AlignmentType.JUSTIFIED;
+          
+          // 3. Verificar se há elementos filhos com alinhamento
+          const alignedChild = element.querySelector('[style*="text-align"], .ql-align-center, .ql-align-right, .ql-align-justify');
+          if (alignedChild) {
+            const childAlign = alignedChild.style.textAlign;
+            if (childAlign === 'center') return AlignmentType.CENTER;
+            if (childAlign === 'right') return AlignmentType.RIGHT;
+            if (childAlign === 'justify') return AlignmentType.JUSTIFIED;
+            
+            if (alignedChild.classList.contains('ql-align-center')) return AlignmentType.CENTER;
+            if (alignedChild.classList.contains('ql-align-right')) return AlignmentType.RIGHT;
+            if (alignedChild.classList.contains('ql-align-justify')) return AlignmentType.JUSTIFIED;
+          }
+          
+          // 4. Verificar atributos de dados
+          const dataAlign = element.getAttribute('data-align');
+          if (dataAlign === 'center') return AlignmentType.CENTER;
+          if (dataAlign === 'right') return AlignmentType.RIGHT;
+          if (dataAlign === 'justify') return AlignmentType.JUSTIFIED;
+          
+          // 5. Para títulos, centralizar por padrão
+          if (tagName.startsWith('h')) return AlignmentType.CENTER;
+          
+          return AlignmentType.LEFT;
+        };
+        
+        const alignment = getAlignment(element);
+        
+        // Determinar o tamanho base para títulos
+        let baseSize = 22;
+        let isBold = false;
+        let spacingBefore = 100;
+        let spacingAfter = 100;
+        
+        if (tagName === 'h1') {
+          baseSize = 32;
+          isBold = true;
+          spacingBefore = 400;
+          spacingAfter = 200;
+        } else if (tagName === 'h2') {
+          baseSize = 28;
+          isBold = true;
+          spacingBefore = 300;
+          spacingAfter = 150;
+        } else if (tagName === 'h3') {
+          baseSize = 24;
+          isBold = true;
+          spacingBefore = 200;
+          spacingAfter = 100;
+        }
+        
+        // Processar todos os filhos do elemento
+        const allRuns = [];
+        const processNode = (node) => {
+          if (node.nodeType === Node.TEXT_NODE) {
+            const text = node.textContent;
+            if (text.trim()) {
+              allRuns.push(new TextRun({ 
+                text: text,
+                size: baseSize,
+                bold: isBold
+              }));
+            }
+          } else if (node.nodeType === Node.ELEMENT_NODE) {
+            const childRuns = processTextRuns(node, baseSize);
+            allRuns.push(...childRuns);
+          }
+        };
+        
+        // Processar todos os nós filhos
+        element.childNodes.forEach(processNode);
+        
+        // Se não houver runs, criar um parágrafo vazio
+        if (allRuns.length === 0) {
+          allRuns.push(new TextRun({ text: '', size: baseSize }));
+        }
+        
+        // Criar o parágrafo
+        paragraphs.push(
+          new Paragraph({
+            children: allRuns,
+            alignment,
+            spacing: {
+              before: spacingBefore,
+              after: spacingAfter
+            },
+            // Adicionar quebra de página após títulos principais se necessário
+            pageBreakBefore: tagName === 'h1' && paragraphs.length > 0
+          })
+        );
+      });
+      
+      // Se não houver parágrafos, criar um documento vazio
+      if (paragraphs.length === 0) {
+        paragraphs.push(
+          new Paragraph({
+            children: [new TextRun({ text: "Contrato", size: 28, bold: true })],
+            alignment: AlignmentType.CENTER,
+            spacing: { before: 400, after: 200 }
+          })
+        );
       }
       
-      paragraphs.push(
-        new Paragraph({
-          children,
-          alignment,
-          spacing: { 
-            before: tagName.startsWith('h') ? 300 : 100, 
-            after: tagName.startsWith('h') ? 200 : 100 
+      // Criar o documento
+      const doc = new Document({
+        sections: [
+          {
+            properties: {
+              page: {
+                margin: {
+                  top: 1440,    // 1 polegada em twips
+                  right: 1440,
+                  bottom: 1440,
+                  left: 1440
+                }
+              }
+            },
+            children: paragraphs,
           },
-        })
-      );
-    });
-
-    const doc = new Document({
-      sections: [
-        {
-          properties: {},
-          children: paragraphs,
-        },
-      ],
-    });
-
-    const blob = await Packer.toBlob(doc);
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `contrato-${contractType.id}-${Date.now()}.docx`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+        ],
+      });
+      
+      // Gerar e baixar o arquivo
+      const blob = await Packer.toBlob(doc);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      
+      // Nome do arquivo mais descritivo
+      const contractName = contractType.name.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase();
+      const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+      link.download = `contrato-${contractName}-${timestamp}.docx`;
+      
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      
+    } catch (error) {
+      console.error('Erro ao gerar documento Word:', error);
+      // Fallback: tentar baixar como HTML se o Word falhar
+      const blob = new Blob([editorContent], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `contrato-${contractType.id}-${Date.now()}.html`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    }
   };
 
   const handleDownload = () => {

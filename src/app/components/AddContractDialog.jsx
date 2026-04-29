@@ -7,11 +7,12 @@ import { Textarea } from './ui/textarea';
 import { Plus, Trash2, Upload } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 
-export function AddContractDialog({ isOpen, onClose, onAdd }) {
+export function AddContractDialog({ isOpen, onClose, onAdd, categories = [] }) {
   const [contractData, setContractData] = useState({
     name: '',
     description: '',
     icon: 'FileText',
+    category: 'outros',
     customFields: [],
     template: '',
   });
@@ -67,6 +68,7 @@ export function AddContractDialog({ isOpen, onClose, onAdd }) {
         name: '',
         description: '',
         icon: 'FileText',
+        category: 'outros',
         customFields: [],
         template: '',
       });
@@ -190,6 +192,25 @@ export function AddContractDialog({ isOpen, onClose, onAdd }) {
                 onChange={(e) => setContractData(prev => ({ ...prev, description: e.target.value }))}
                 placeholder="Breve descrição do contrato"
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="contractCategory">Categoria</Label>
+              <Select 
+                value={contractData.category} 
+                onValueChange={(value) => setContractData(prev => ({ ...prev, category: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione uma categoria" />
+                </SelectTrigger>
+                <SelectContent>
+                  {categories.map(category => (
+                    <SelectItem key={category.id} value={category.id}>
+                      {category.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
